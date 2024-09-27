@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect } from "react"
 import { useFtcLive } from "../contexts/FtcLiveContext";
 import { usePersistentState } from "../helpers/persistant";
 import { FtcMatch } from "../types/FtcLive";
-import { TypeParameterDeclaration } from "typescript";
 import {useObsStudio} from "../contexts/ObsStudioContext";
 
 interface MatchRow {
