@@ -16,7 +16,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Npm build to gh-pages
-      uses: diy-pwa/npm-build-2-gh-pages@v1.11
-          
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    - run: npm ci
+    - run: npm run build --if-present
+    - actions/deploy-pages@v4
+      with:
+        timeout: 600000
+        error_count: 10
+        reporting_interval: 5000
+        artifact_name: github-pages
+        preview: false
           
