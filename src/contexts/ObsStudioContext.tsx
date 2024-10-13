@@ -24,6 +24,7 @@ interface ObsStudioContextData {
   fetchScenes: () => Promise<string[]>;
   switchScenes: (scene: string) => void;
   setActiveField: (field: number) => void;
+  updateEventCode: (url: string, eventCode: string) => void;
   field1Scene?: string;
   setField1Scene: React.Dispatch<React.SetStateAction<string | undefined>>;
   field2Scene?: string;
@@ -117,6 +118,31 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
     }
   }
 
+  const updateEventCode = async (url: string, eventCode: string) => {
+    const {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
+    console.log("Changing URLs to", url," and code ", eventCode)
+    console.log(inputs)
+    for (const inp of inputs) {
+      const inputName = inp?.inputName?.toString() ?? ""
+      const {inputSettings} = await obs.call('GetInputSettings', {inputName: inputName});
+
+      let decoded_url = new URL(inputSettings?.url?.toString() ?? "")
+      let split_path = decoded_url.pathname.split('/')
+      if (split_path[1] === 'event') {
+        split_path[2] = eventCode
+        decoded_url.pathname = split_path.join('/')
+        decoded_url.hostname = url
+
+        console.log("Updated Source", inp.inputName, " to url ", decoded_url.href)
+
+      } else {
+        console.log("Path does not match filter on source",inp.inputName, " url ", decoded_url.pathname)
+      }
+
+      await obs.call('SetInputSettings', {inputName: inputName, overlay: true, inputSettings: {'url': decoded_url.href}})
+    }
+  }
+
   const setActiveField = async (field: number) => {
     const field1Scene = field1SceneRef.current
     const field2Scene = field2SceneRef.current
@@ -134,7 +160,7 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
   }
 
   return (
-    <ObsStudioContext.Provider value={{ obsUrl, setObsUrl, obsPort, setObsPort, obsPassword, setObsPassword, isConnected, connectToObs, disconnectFromObs, fetchScenes, switchScenes, field1Scene, field2Scene, setField1Scene, setField2Scene, setActiveField, error, startStreamTime}}>
+    <ObsStudioContext.Provider value={{ obsUrl, setObsUrl, obsPort, setObsPort, obsPassword, setObsPassword, isConnected, connectToObs, disconnectFromObs, fetchScenes, switchScenes, field1Scene, field2Scene, setField1Scene, setField2Scene, setActiveField, error, startStreamTime, updateEventCode}}>
       {children}
     </ObsStudioContext.Provider>
   );

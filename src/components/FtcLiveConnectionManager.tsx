@@ -49,7 +49,7 @@ const FtcLiveConnectionManager: React.FC = () => {
         ))}
       </select>
 
-      <button onClick={(e) => connectWebSocket(!isConnected)} disabled={!selectedEvent}>
+      <button onClick={(e) => connectWebSocket(!isConnected)} disabled={!(events.length)}>
         {isConnected ? 'Disconnnect' : 'Connect'}
       </button>
       <div><br />

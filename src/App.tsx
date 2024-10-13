@@ -7,6 +7,7 @@ import { ObsStudioProvider } from './contexts/ObsStudioContext';
 import ObsStudioManager from './components/ObsStudioConnectionManager';
 import SceneMapper from './components/SceneMapper';
 import MatchEventsTable from './components/MatchEventsTable';
+import BrowserSourceUpdater from './components/BrowserSourceUpdater'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
       </header>
         <FtcLiveConnectionManager />
         <ObsStudioManager />
+        <BrowserSourceUpdater />
         <SceneMapper />
         <MatchEventsTable />
     </div>
