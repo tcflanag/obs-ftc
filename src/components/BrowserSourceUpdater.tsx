@@ -24,7 +24,7 @@ const BrowserSourceUpdater = () => {
     }
 
   return (
-    <div className="section">
+    <div className="section" style={{overflowX:"scroll"}}>
         <h2>Update Browser Source URLs </h2>
         <button onClick={() => handleFetchScenes ()} disabled={!isConnected}>Fetch Broswer Sources</button>
         <button onClick={() => handleUpdateEvent()} disabled={(!isConnected || !isFtcLiveConnected)}>Update Event Code</button>
@@ -39,8 +39,8 @@ const BrowserSourceUpdater = () => {
             <tbody>
             {rows.map(row => (
                 <tr key={row.name} >
-                    <td style={{textAlign: 'left', paddingRight: "1em"}}>{row.name}</td>
-                    <td style={{textAlign: 'left'}}>{row.url.substring(0,90)}...</td> {/*FIXME:  Make this smarter */}
+                    <td style={{textAlign: 'left', whiteSpace: "nowrap", paddingRight: "1em"}}>{row.name}</td>
+                    <td  style={{textAlign: 'left',whiteSpace: "nowrap"}}>{row.url}</td>
 
                 </tr>
             ))}
