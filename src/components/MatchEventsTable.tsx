@@ -49,6 +49,101 @@ const MatchEventsTable: React.FC = () => {
   const { startStreamTime } = useObsStudio()
   const [useStreamTime, setUseStreamTime] = usePersistentState<boolean>('Use_Stream_Time', false)
 
+  async function teamLookup(teamNumber: number | undefined) {
+    // Bad input
+    if (!teamNumber) return
+    // Already have it cached
+    if (teams.find(team => team.number === teamNumber)) return
+    console.log("Looking up team ", teamNumber)
+    const teamDataResponse = await fetch(`http://${serverUrl}/api/v1/events/${selectedEvent?.eventCode}/teams/${teamNumber}/`)
+
+    if (teamDataResponse.status === 429) {
+      // Retrying isn't vital assuming it's a 1-off.  Next time the team is up, it will try again.
+      // This should also only be called in the first round of matches.
+      console.error("Rate limit fetching team name")
+      return
+    }
+    const teamData = await teamDataResponse.json()
+
+    setTeams(currentTeams => {return [...currentTeams, teamData]})
+
+  }
+
+
+  useEffect(() => {
+    // Check for rows with undefined teams
+    const rowIndex = rows.findIndex(row => row.blue1 === undefined)
+
+    if (rowIndex === -1) return
+
+    const name = rows[rowIndex].name
+
+    if (name === undefined) return
+    fetchMatch(name).then(async teams => {
+      if (teams === undefined) return
+
+      console.log("Found teams for match ", name, teams)
+
+      // Get and store team names.
+      // Needs to be await, otherwise the set functions step on each other
+      await teamLookup(teams[0][0])
+      await teamLookup(teams[0][1])
+      await teamLookup(teams[0][2])
+      await teamLookup(teams[1][0])
+      await teamLookup(teams[1][1])
+      await teamLookup(teams[1][2])
+
+
+      // Copy since original is immutable
+      const newRows = [...rows];
+      let newRow = {...newRows[rowIndex]};
+
+      newRow.red1 = teams[0][0]
+      newRow.red2 = teams[0][1]
+      newRow.red3 = teams[0][2]
+      newRow.blue1 = teams[1][0]
+      newRow.blue2 = teams[1][1]
+      newRow.blue3 = teams[1][2]
+
+
+      console.log("Adding ", newRow, rowIndex)
+      newRows[rowIndex] = newRow;
+      setRows(newRows)
+
+      console.log("Done Set")
+    })
+    console.log("Found")
+  })
+
+  const fetchMatch = async (matchName: string) => {
+    // Get Data for an individual match
+    console.log('fetching match ', matchName)
+    try {
+      let response;
+      if (matchName.startsWith('Q')) {
+        const matchNumber = matchName.replace('Q', '')
+        response = await fetch(`http://${serverUrl}/api/v1/events/${selectedEvent?.eventCode}/matches/${matchNumber}/`)
+
+      } else {
+        response = await fetch(`http://${serverUrl}/api/v2/events/${selectedEvent?.eventCode}/elims/${matchName.toLowerCase()}/`)
+      }
+      if (response.status === 429) {
+        console.error("Rate limit fetching match data")
+        return [[], []]
+      }
+      let match = await response.json()
+
+      const blue_teams = [match.blue.robot1, match.blue.robot2, match.blue.robot3]
+      const red_teams = [match.red.robot1, match.red.robot2, match.red.robot3]
+      return [red_teams,blue_teams]
+
+
+    } catch (error) {
+      console.error('Fetching matches failed: ', error)
+      return [[], []]
+    }
+  }
+
   useEffect(() => {
     if (latestStreamData) {
       setRows(currentRows => {
