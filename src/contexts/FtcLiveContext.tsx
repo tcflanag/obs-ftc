@@ -46,7 +46,7 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
   // The function to connect the WebSocket and handle messages
   const connectWebSocket = useCallback((connect: boolean) => {
     if (selectedEvent && connect) {
-      const socket = new WebSocket(`ws://${serverUrl}/api/v2/stream/?code=${selectedEvent.eventCode}`);
+      const socket = new WebSocket(`ws://${serverUrl}/stream/display/command/?code=${selectedEvent.eventCode}`);
       setSocket(socket)
 
       socket.onopen = () => {
@@ -68,15 +68,15 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
         if (data === 'pong') return; // ignore pong messages
 
         const streamData = JSON.parse(data) as FtcLiveSteamData;
-        console.log('Websocket Message: ', streamData)
+        //console.log('Websocket Message: ', streamData)
         setAllStreamData(prevMessages => [...prevMessages, streamData]);
         setLatestStreamData(streamData);
-        console.log('Selected Triggers:', selectedTriggers)
-        if (selectedTriggers.some(trigger => trigger === streamData.updateType)) {
+        //console.log('Selected Triggers:', selectedTriggers)
+        if (selectedTriggers.some(trigger => trigger === streamData.type)) {
           console.log('Set the active field')
-          setActiveField(streamData.payload.field)
+          setActiveField(streamData.field)
         } else {
-          console.log('Event was not in the selected triggers list:', streamData.updateType)
+          console.log('Event was not in the selected triggers list:', streamData.type)
         }
       }
     } else if (!connect) {
