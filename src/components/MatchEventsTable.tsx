@@ -57,7 +57,7 @@ const MatchEventsTable: React.FC = () => {
   const [teams, setTeams] = usePersistentState<Team[]>('Teams', [])
   const [chapters, setChapters] = usePersistentState<string[]>('Video_Chapters', [])
   const [offsetTime, setOffsetTime] = usePersistentState<number>('Offset_Time', 0)
-  const { isConnected, serverUrl, selectedEvent } = useFtcLive()
+  const { isConnected, selectedEvent } = useFtcLive()
   const { latestStreamData } = useFtcLive()
   const { startStreamTime } = useObsStudio()
   const [useStreamTime, setUseStreamTime] = usePersistentState<boolean>('Use_Stream_Time', false)
@@ -152,25 +152,27 @@ const MatchEventsTable: React.FC = () => {
         }
       });
     }
-  }, [latestStreamData, setRows]); // Removed 'rows' and 'setRows' from the dependencies
+  }, [latestStreamData, setRows, setTeams, teams]); // Removed 'rows' and 'setRows' from the dependencies
 
 
-  function calcTimeString(actionTime:number, firstTime:number) {
-    let time = ((actionTime ?? 0) - firstTime) / 1000 + offsetTime
-    let timeString = "N/A"
-    if (time >= 0) {
-      // Negative times look bad so show N/A instead
-      const hours = Math.floor(time / 3600)
-      time -= hours * 3600
-      const minutes = Math.floor(time / 60)
-      time -= minutes * 60
-      const seconds = Math.floor(time)
-      timeString = `${hours < 10 ? '0' + hours : hours}:${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`
-    }
-    return timeString;
-  }
 
   useEffect(() => {
+
+    function calcTimeString(actionTime:number, firstTime:number) {
+      let time = ((actionTime ?? 0) - firstTime) / 1000 + offsetTime
+      let timeString = "N/A"
+      if (time >= 0) {
+        // Negative times look bad so show N/A instead
+        const hours = Math.floor(time / 3600)
+        time -= hours * 3600
+        const minutes = Math.floor(time / 60)
+        time -= minutes * 60
+        const seconds = Math.floor(time)
+        timeString = `${hours < 10 ? '0' + hours : hours}:${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`
+      }
+      return timeString;
+    }
+
     const getTeamName = (number?: number) => {
       if (!number) return undefined;
       return teams.find(team => team.number === number)
@@ -209,9 +211,6 @@ const MatchEventsTable: React.FC = () => {
     setChapters(['00:00:00 Event Start', ...chapters])
   }, [rows, setChapters, teams, offsetTime, startStreamTime, useStreamTime])
 
-  const delay = (seconds: number) => {
-    return new Promise(resolve => setTimeout(resolve, seconds * 1000))
-  }
 
   const fetchMatches = async () => {
   }
