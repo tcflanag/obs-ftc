@@ -15,7 +15,6 @@ interface FtcLiveContextData {
   selectedEvent?: Event;
   setSelectedEvent: React.Dispatch<React.SetStateAction<Event|undefined>>;
   isConnected: boolean;
-  allStreamData: FtcLiveSteamData[];
   latestStreamData?: FtcLiveSteamData;
   connectWebSocket: (connect: boolean) => void;
   selectedTriggers: UpdateType[];
@@ -35,7 +34,7 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
   const { setActiveField } = useObsStudio();
   const [serverUrl, setServerUrl] = usePersistentState<string>('FTC_URL', 'localhost');
   const [selectedEvent, setSelectedEvent] = usePersistentState<Event|undefined>('FTC_Event', undefined);
-  const [allStreamData, setAllStreamData] = usePersistentState<FtcLiveSteamData[]>('Socket_Messages', []);
+
   const [latestStreamData, setLatestStreamData] = useState<FtcLiveSteamData|undefined>();
   const [isConnected, setConnected] = useState<boolean>(false);
   const [socket, setSocket] = useState<WebSocket | undefined>();
@@ -69,7 +68,6 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
 
         const streamData = JSON.parse(data) as FtcLiveSteamData;
         //console.log('Websocket Message: ', streamData)
-        setAllStreamData(prevMessages => [...prevMessages, streamData]);
         setLatestStreamData(streamData);
         //console.log('Selected Triggers:', selectedTriggers)
         if (selectedTriggers.some(trigger => trigger === streamData.type)) {
@@ -83,13 +81,13 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
       socket?.close();
       setConnected(false);
     }
-  }, [serverUrl, socket, selectedEvent, selectedTriggers, setActiveField, setAllStreamData]);
+  }, [serverUrl, socket, selectedEvent, selectedTriggers, setActiveField]);
 
   // ... other logic
 
   // Provide the context value to children
   return (
-    <FtcLiveContext.Provider value={{ serverUrl, setServerUrl, selectedEvent, setSelectedEvent, allStreamData, connectWebSocket, isConnected, latestStreamData, selectedTriggers, setSelectedTriggers }}>
+    <FtcLiveContext.Provider value={{ serverUrl, setServerUrl, selectedEvent, setSelectedEvent, connectWebSocket, isConnected, latestStreamData, selectedTriggers, setSelectedTriggers }}>
       {children}
     </FtcLiveContext.Provider>
   );
