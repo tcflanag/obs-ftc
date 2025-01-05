@@ -8,7 +8,7 @@ export interface Event {
   end: Date;
   type: string; // make enum
   status: string; // make enum
-};
+}
 
 
 export type UpdateType =
@@ -37,6 +37,11 @@ type TeamData = {
 }
 type MatchParams = {
   matchName: string;
+  elims: boolean;
+  number: number;
+  displayNumber: number;
+  series: number;
+
   red: {teams: TeamData[]};
   blue: {teams: TeamData[]};
 }
@@ -49,7 +54,7 @@ export interface FtcLiveSteamData {
   init: boolean;
   params: (AwardParams|MatchParams);
   index: number;
-};
+}
 
 export function isMatch(data: (AwardParams|MatchParams)): data is MatchParams {
   return (data as MatchParams).matchName !== undefined

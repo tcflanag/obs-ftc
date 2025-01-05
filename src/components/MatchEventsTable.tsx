@@ -44,7 +44,8 @@ function categoryRemapper(category: UpdateType): UpdateType{
   const remap = {
     "SHOW_RESULTS": "MATCH_POST",
         "START_MATCH": "MATCH_START",
-    "ABORT_MATCH": "MATCH_ABORT"
+    "ABORT_MATCH": "MATCH_ABORT",
+    "SHOW_SETUP":"MATCH_LOAD",
   }
   // @ts-ignore
   return remap[category] ?? category
@@ -73,14 +74,18 @@ const MatchEventsTable: React.FC = () => {
 
 
       console.log("ZZZZ",latestStreamData)
-      if (!UpdateTypes.includes(latestStreamData.type)) {
-        console.log("Unknown type", latestStreamData.type)
+      if (!UpdateTypes.includes(categoryRemapper(latestStreamData.type))) {
+        console.log("Unknown type", categoryRemapper(latestStreamData.type))
         return
       }
       setRows(currentRows => {
         // Check if the row already exists
         if  (isMatch(latestStreamData.params)) {
-          const matchName = latestStreamData.params.matchName
+
+          var matchName = latestStreamData.params.matchName
+          if (!latestStreamData.params.elims) {
+            matchName = "Q"+ latestStreamData.params.number
+          }
           let rowIndex = currentRows.findIndex(row => row.name === matchName);
           if (rowIndex !== -1) {
             console.log('update row');
@@ -89,7 +94,7 @@ const MatchEventsTable: React.FC = () => {
             let newRow = {...newRows[rowIndex]};
             // @ts-ignore
             newRow[categoryRemapper(latestStreamData.type)] = latestStreamData.ts;
-            newRow.name = latestStreamData.params.matchName;
+            newRow.name = matchName;
             newRows[rowIndex] = newRow;
             return newRows;
           } else {
@@ -101,10 +106,14 @@ const MatchEventsTable: React.FC = () => {
 
             console.log(latestStreamData.params.red.teams[0].number)
             console.log(latestStreamData.type)
+            let matchName = latestStreamData.params.matchName
+            if (!latestStreamData.params.elims) {
+              matchName = "Q"+ latestStreamData.params.number
+            }
             let newRow: MatchRow = {
               award_mode: false,
               number: latestStreamData.index,
-              name: latestStreamData.params.matchName,
+              name: matchName,
 
 
               [categoryRemapper(latestStreamData.type)]: latestStreamData.ts,
@@ -195,17 +204,17 @@ const MatchEventsTable: React.FC = () => {
     let chapters: string[] = rows.map(r => {
       if (r.award_mode) {
         let timeString = calcTimeString(r.SHOW_PREVIEW ?? 0, firstTime);
-        return `${timeString} ${r.name}`
+        return `${timeString} 🏆 ${r.name}`
 
       } else {
-        let blueTeams = `${r.blue1} ${getTeamName(r.blue1)?.name}, ${r.blue2} ${getTeamName(r.blue2)?.name}`
+        let blueTeams = `🔵${r.blue1} ${getTeamName(r.blue1)?.name} 🔵 ${r.blue2} ${getTeamName(r.blue2)?.name}`
         if (r.blue3)
           blueTeams += `${r.blue3} ${getTeamName(r.blue3)?.name}`
-        let redTeams = `${r.red1} ${getTeamName(r.red1)?.name}, ${r.red2} ${getTeamName(r.red2)?.name}`
+        let redTeams = `🔴 ${r.red1} ${getTeamName(r.red1)?.name} 🔴 ${r.red2} ${getTeamName(r.red2)?.name}`
         if (r.red3)
           redTeams += `${r.red3} ${getTeamName(r.red3)?.name}`
         let timeString = calcTimeString(r.SHOW_PREVIEW ?? 0, firstTime);
-        return `${timeString} ${r.name} - Blue: ${blueTeams}; Red: ${redTeams}`
+        return `${timeString} ${r.name} ${blueTeams} ${redTeams}`
       }
     })
     setChapters(['00:00:00 Event Start', ...chapters])
@@ -240,25 +249,25 @@ const MatchEventsTable: React.FC = () => {
       <button onClick={fetchMatches} disabled={!isConnected}>Get Match List</button>
       <button onClick={clearRows}>Clear All Data</button>
       <button onClick={exportData}>Export Data</button>
-      <table>
+      <table border={1}>
         <thead>
           <tr>
-            <th>Number</th>
+            <th>ID</th>
             <th>Name</th>
-            <th>Schedule Time</th>
+            {/*<th>Schedule Time</th>*/}
             <th>Blue 1</th>
             <th>Blue 2</th>
-            <th>Blue 3</th>
+            {/*<th>Blue 3</th>*/}
             <th>Red 1</th>
             <th>Red 2</th>
-            <th>Red 3</th>
+            {/*<th>Red 3</th>*/}
             <th>LOAD</th>
             <th>SHOW PREVIEW</th>
-            <th>SHOW RANDOM</th>
+            {/*<th>SHOW RANDOM</th>*/}
             <th>SHOW MATCH</th>
             <th>START</th>
             <th>ABORT</th>
-            <th>COMMIT</th>
+            {/*<th>COMMIT</th>*/}
             <th>POST</th>
           </tr>
         </thead>
@@ -267,20 +276,20 @@ const MatchEventsTable: React.FC = () => {
             <tr key={row.name}>
               <td>{row.number}</td>
               <td>{row.name}</td>
-              <td>{row.scheduledTime ? new Date(row.scheduledTime).toLocaleTimeString() : ''}</td>
+              {/*<td>{row.scheduledTime ? new Date(row.scheduledTime).toLocaleTimeString() : ''}</td>*/}
               <td>{row.blue1}</td>
               <td>{row.blue2}</td>
-              <td>{row.blue3}</td>
+              {/*<td>{row.blue3}</td>*/}
               <td>{row.red1}</td>
               <td>{row.red2}</td>
-              <td>{row.red3}</td>
+              {/*<td>{row.red3}</td>*/}
               <td>{row.MATCH_LOAD ? new Date(row.MATCH_LOAD).toLocaleTimeString() : ''}</td>
               <td>{row.SHOW_PREVIEW ? new Date(row.SHOW_PREVIEW).toLocaleTimeString() : ''}</td>
-              <td>{row.SHOW_RANDOM ? new Date(row.SHOW_RANDOM).toLocaleTimeString() : ''}</td>
+              {/*<td>{row.SHOW_RANDOM ? new Date(row.SHOW_RANDOM).toLocaleTimeString() : ''}</td>*/}
               <td>{row.SHOW_MATCH ? new Date(row.SHOW_MATCH).toLocaleTimeString() : ''}</td>
               <td>{row.MATCH_START ? new Date(row.MATCH_START).toLocaleTimeString() : ''}</td>
               <td>{row.MATCH_ABORT ? new Date(row.MATCH_ABORT).toLocaleTimeString() : ''}</td>
-              <td>{row.MATCH_COMMIT ? new Date(row.MATCH_COMMIT).toLocaleTimeString() : ''}</td>
+              {/*<td>{row.MATCH_COMMIT ? new Date(row.MATCH_COMMIT).toLocaleTimeString() : ''}</td>*/}
               <td>{row.MATCH_POST ? new Date(row.MATCH_POST).toLocaleTimeString() : ''}</td>
             </tr>
           ))}
@@ -301,9 +310,11 @@ const MatchEventsTable: React.FC = () => {
              onChange={(e) => setUseStreamTime(e.target.checked)}
       />
       <br />
-      <div>
-        {chapters.map((chapter, i) => (<div key={i}>{chapter}</div>))}
-      </div>
+      <hr/>
+
+      <ul style={{margin: 'auto', display:'inline-block', border:'1px black',textAlign:'left', listStyleType: 'none'}}>
+        {chapters.map((chapter, i) => (<li  key={i}>{chapter}</li>))}
+      </ul>
 
     </div>
   )
