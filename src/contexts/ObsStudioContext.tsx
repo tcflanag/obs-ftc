@@ -148,7 +148,7 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
         const {inputSettings} = await obs.call('GetInputSettings', {inputName: inputName});
 
         let decoded_url = new URL(inputSettings?.content?.toString() ?? "")
-        let split_path = decoded_url.pathname.split('/')
+        //let split_path = decoded_url.pathname.split('/')
 
         if (decoded_url.host === 'ftc-events.firstinspires.org') {
           const data: sourceData= {name:inputName, url:inputSettings?.content?.toString() ?? ""}
