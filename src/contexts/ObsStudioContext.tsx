@@ -126,7 +126,7 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
   const fetchBrowserSources = useCallback(async (): Promise<sourceData[] > => {
     try {
       let inputList: sourceData[] = []
-      const {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
+      let {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
 
       for (const inp of inputs) {
         const inputName = inp?.inputName?.toString() ?? ""
@@ -139,6 +139,23 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
           inputList.push(data)
         }
       }
+
+      // Update QR Source
+      ({inputs} = await obs.call('GetInputList', {inputKind: 'streamqr_source'}))
+
+      for (const inp of inputs) {
+        const inputName = inp?.inputName?.toString() ?? ""
+        const {inputSettings} = await obs.call('GetInputSettings', {inputName: inputName});
+
+        let decoded_url = new URL(inputSettings?.content?.toString() ?? "")
+        let split_path = decoded_url.pathname.split('/')
+
+        if (decoded_url.host === 'ftc-events.firstinspires.org') {
+          const data: sourceData= {name:inputName, url:inputSettings?.content?.toString() ?? ""}
+          inputList.push(data)
+        }
+      }
+
       console.log("inputs:", inputList)
       return inputList;
     } catch (error) {
@@ -148,7 +165,7 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
   }, []);
 
   const updateEventCode = async (url: string, eventCode: string) => {
-    const {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
+    let {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
     console.log("Changing URLs to", url," and code ", eventCode)
     console.log(inputs)
     for (const inp of inputs) {
@@ -170,6 +187,28 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
 
       await obs.call('SetInputSettings', {inputName: inputName, overlay: true, inputSettings: {'url': decoded_url.href}})
     }
+    // Update QR Source
+    ({inputs} = await obs.call('GetInputList', {inputKind: 'streamqr_source'}))
+    console.log("Changing URLs to", url, " and code ", eventCode)
+    console.log(inputs)
+    for (const inp of inputs) {
+      const inputName = inp?.inputName?.toString() ?? ""
+      const {inputSettings} = await obs.call('GetInputSettings', {inputName: inputName});
+
+      let decoded_url = new URL(inputSettings?.content?.toString() ?? "")
+      let split_path = decoded_url.pathname.split('/')
+      if (decoded_url.host === 'ftc-events.firstinspires.org') {
+        split_path[2] = eventCode
+        decoded_url.pathname = split_path.join('/')
+        console.log("Updated Source", inp.content, " to url ", decoded_url.href)
+
+      } else {
+        console.log("Path does not match filter on source", inp.content, " url ", decoded_url.pathname)
+      }
+
+      await obs.call('SetInputSettings', {inputName: inputName, overlay: true, inputSettings: {'content': decoded_url.href}})
+    }
+
   }
 
   const setActiveField = async (field: number) => {
