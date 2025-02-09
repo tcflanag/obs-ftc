@@ -134,7 +134,7 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
           split_path[2] = eventCode
           decoded_url.pathname = split_path.join('/')
           decoded_url.hostname = url
-        } else if (decoded_url.host === 'ftc-events.firstinspires.org') {
+        } else if (decoded_url.host === 'ftc-events.firstinspires.org' || decoded_url.host === 'ftc.events') {
           split_path[2] = eventCode
           decoded_url.pathname = split_path.join('/')
         } else {
