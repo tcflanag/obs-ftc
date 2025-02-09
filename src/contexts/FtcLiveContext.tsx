@@ -73,8 +73,6 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
         if (selectedTriggers.some(trigger => trigger === streamData.type)) {
           console.log('Set the active field')
           setActiveField(streamData.field)
-        } else {
-          console.log('Event was not in the selected triggers list:', streamData.type)
         }
       }
     } else if (!connect) {

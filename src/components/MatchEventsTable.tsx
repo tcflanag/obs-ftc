@@ -71,7 +71,9 @@ const MatchEventsTable: React.FC = () => {
       setTeams(currentTeams=>{return[...currentTeams,{number:team.number,name:team.name}]})
     }
     if (latestStreamData) {
-
+      if (["TIMEOUT_UPDATE", "PIT_UPDATE"].includes(latestStreamData.type)  ) {
+        return
+      }
 
       console.log("ZZZZ",latestStreamData)
       if (!UpdateTypes.includes(categoryRemapper(latestStreamData.type))) {
@@ -87,6 +89,11 @@ const MatchEventsTable: React.FC = () => {
             matchName = "Q"+ latestStreamData.params.number
           }
           let rowIndex = currentRows.findIndex(row => row.name === matchName);
+          if (!(latestStreamData.ts >0)) {
+            console.error("Skipping bogus timestamp", latestStreamData.type, latestStreamData.ts)
+            return currentRows
+          }
+
           if (rowIndex !== -1) {
             console.log('update row');
             // Clone the array and update the specific row
@@ -104,7 +111,6 @@ const MatchEventsTable: React.FC = () => {
             // Create a new row and add it to the array
             console.log(latestStreamData.params)
 
-            console.log(latestStreamData.params.red.teams[0].number)
             console.log(latestStreamData.type)
             let matchName = latestStreamData.params.matchName
             if (!latestStreamData.params.elims) {
