@@ -71,15 +71,22 @@ const MatchEventsTable: React.FC = () => {
       setTeams(currentTeams=>{return[...currentTeams,{number:team.number,name:team.name}]})
     }
     if (latestStreamData) {
-      if (["TIMEOUT_UPDATE", "PIT_UPDATE"].includes(latestStreamData.type)  ) {
+      if (["TIMEOUT_UPDATE", "PIT_UPDATE", "SCORE_UPDATE"].includes(latestStreamData.type)  ) {
         return
       }
 
-      console.log("ZZZZ",latestStreamData)
+      console.debug("ZZZZ",latestStreamData)
       if (!UpdateTypes.includes(categoryRemapper(latestStreamData.type))) {
         console.log("Unknown type", categoryRemapper(latestStreamData.type))
         return
       }
+      if  (isMatch(latestStreamData.params)) {
+        console.log("Setting matchName:", latestStreamData.params?.matchName, " index:", latestStreamData.index, " category:", latestStreamData.type, " @ Time:", latestStreamData.ts)
+      }
+      else if (isAward(latestStreamData.params)) {
+        console.log("Setting awards:", latestStreamData.params.award.name, " index:", latestStreamData.index, " category:", latestStreamData.type, " @ Time:", latestStreamData.ts)
+      }
+
       setRows(currentRows => {
         // Check if the row already exists
         if  (isMatch(latestStreamData.params)) {
@@ -95,7 +102,7 @@ const MatchEventsTable: React.FC = () => {
           }
 
           if (rowIndex !== -1) {
-            console.log('update row');
+            console.debug('update row');
             // Clone the array and update the specific row
             const newRows = [...currentRows];
             let newRow = {...newRows[rowIndex]};
@@ -106,12 +113,12 @@ const MatchEventsTable: React.FC = () => {
             return newRows;
           } else {
             if (!latestStreamData.params.red) return currentRows
-            console.log('create new row');
+            console.debug('create new row');
 
             // Create a new row and add it to the array
-            console.log(latestStreamData.params)
+            console.debug(latestStreamData.params)
 
-            console.log(latestStreamData.type)
+            console.debug(latestStreamData.type)
             let matchName = latestStreamData.params.matchName
             if (!latestStreamData.params.elims) {
               matchName = "Q"+ latestStreamData.params.number
@@ -143,7 +150,7 @@ const MatchEventsTable: React.FC = () => {
           const awardName = latestStreamData.params.award.name
           let rowIndex = currentRows.findIndex(row => row.name === awardName);
           if (rowIndex !== -1){
-            console.log('update row');
+            console.debug('update row');
             // Clone the array and update the specific row
             const newRows = [...currentRows];
             let newRow = {...newRows[rowIndex]};
@@ -162,7 +169,7 @@ const MatchEventsTable: React.FC = () => {
         }
         else {
           // Unhandled stuff
-          console.log("**Unhandled message", latestStreamData.type)
+          console.error("**Unhandled message", latestStreamData.type)
           return currentRows
         }
       });
@@ -209,7 +216,7 @@ const MatchEventsTable: React.FC = () => {
     const firstTime = useStreamTime? startStreamTime:rows[0]?.SHOW_PREVIEW ?? 0
     let chapters: string[] = rows.map(r => {
       if (r.award_mode) {
-        let timeString = calcTimeString(r.SHOW_PREVIEW ?? 0, firstTime);
+        let timeString = calcTimeString(r.SHOW_PREVIEW ?? r.SHOW_MATCH ?? r.MATCH_START ?? 0, firstTime);
         return `${timeString} 🏆 ${r.name}`
 
       } else {
@@ -219,7 +226,7 @@ const MatchEventsTable: React.FC = () => {
         let redTeams = `🔴 ${r.red1} ${getTeamName(r.red1)?.name} 🔴 ${r.red2} ${getTeamName(r.red2)?.name}`
         if (r.red3)
           redTeams += `${r.red3} ${getTeamName(r.red3)?.name}`
-        let timeString = calcTimeString(r.SHOW_PREVIEW ?? 0, firstTime);
+        let timeString = calcTimeString(r.SHOW_PREVIEW ?? r.SHOW_MATCH ?? r.MATCH_START ?? 0, firstTime);
         return `${timeString} ${r.name} ${blueTeams} ${redTeams}`
       }
     })

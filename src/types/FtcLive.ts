@@ -65,6 +65,7 @@ export function isAward(data: (AwardParams|MatchParams)): data is AwardParams {
 }
 
 export const UpdateTypes: UpdateType[] = [
+  //TODO Support for Redirect
   'MATCH_LOAD',
   'MATCH_START',
   'MATCH_ABORT',

@@ -25,3 +25,7 @@ yarn-error.log*
 # Firebase
 .firebase
 
+# Editors
+.idea
+
+

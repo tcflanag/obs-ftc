@@ -34,7 +34,6 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
   const { setActiveField } = useObsStudio();
   const [serverUrl, setServerUrl] = usePersistentState<string>('FTC_URL', 'localhost');
   const [selectedEvent, setSelectedEvent] = usePersistentState<Event|undefined>('FTC_Event', undefined);
-
   const [latestStreamData, setLatestStreamData] = useState<FtcLiveSteamData|undefined>();
   const [isConnected, setConnected] = useState<boolean>(false);
   const [socket, setSocket] = useState<WebSocket | undefined>();
@@ -71,7 +70,7 @@ export const FtcLiveProvider: React.FC<FtcLiveProviderProps> = ({ children }) =>
         setLatestStreamData(streamData);
         //console.log('Selected Triggers:', selectedTriggers)
         if (selectedTriggers.some(trigger => trigger === streamData.type)) {
-          console.log('Set the active field')
+          console.debug('Set the active field')
           setActiveField(streamData.field)
         }
       }
