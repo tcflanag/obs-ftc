@@ -1,13 +1,14 @@
 import React, { useEffect } from "react"
 import { useFtcLive } from "../contexts/FtcLiveContext";
 import { usePersistentState } from "../helpers/persistant";
-import { FtcMatch } from "../types/FtcLive";
+import {isAward, isMatch, UpdateType, UpdateTypes} from "../types/FtcLive";
 import {useObsStudio} from "../contexts/ObsStudioContext";
 
 interface MatchRow {
   number: number;
   name: string;
   scheduledTime?: number;
+  award_mode: boolean
   blue1?: number;
   blue2?: number;
   blue3?: number;
@@ -24,7 +25,7 @@ interface MatchRow {
   MATCH_POST?: number;
 }
 
-type TeamData = {
+export type TeamData = {
   number: number;
   name: string;
   school: string;
@@ -39,141 +40,161 @@ type Team = {
   name: string;
 }
 
+function categoryRemapper(category: UpdateType): UpdateType{
+  const remap = {
+    "SHOW_RESULTS": "MATCH_POST",
+        "START_MATCH": "MATCH_START",
+    "ABORT_MATCH": "MATCH_ABORT",
+    "SHOW_SETUP":"MATCH_LOAD",
+  }
+  // @ts-ignore
+  return remap[category] ?? category
+
+}
+
+
 const MatchEventsTable: React.FC = () => {
   const [rows, setRows] = usePersistentState<MatchRow[]>('Match_Events', [])
   const [teams, setTeams] = usePersistentState<Team[]>('Teams', [])
   const [chapters, setChapters] = usePersistentState<string[]>('Video_Chapters', [])
   const [offsetTime, setOffsetTime] = usePersistentState<number>('Offset_Time', 0)
-  const { isConnected, serverUrl, selectedEvent } = useFtcLive()
+  const { isConnected, selectedEvent } = useFtcLive()
   const { latestStreamData } = useFtcLive()
   const { startStreamTime } = useObsStudio()
   const [useStreamTime, setUseStreamTime] = usePersistentState<boolean>('Use_Stream_Time', false)
 
-  async function teamLookup(teamNumber: number | undefined) {
-    // Bad input
-    if (!teamNumber) return
-    // Already have it cached
-    if (teams.find(team => team.number === teamNumber)) return
-    console.log("Looking up team ", teamNumber)
-    const teamDataResponse = await fetch(`http://${serverUrl}/api/v1/events/${selectedEvent?.eventCode}/teams/${teamNumber}/`)
-
-    if (teamDataResponse.status === 429) {
-      // Retrying isn't vital assuming it's a 1-off.  Next time the team is up, it will try again.
-      // This should also only be called in the first round of matches.
-      console.error("Rate limit fetching team name")
-      return
-    }
-    const teamData = await teamDataResponse.json()
-
-    setTeams(currentTeams => {return [...currentTeams, teamData]})
-
-  }
-
 
   useEffect(() => {
-    // Check for rows with undefined teams
-    const rowIndex = rows.findIndex(row => row.blue1 === undefined)
-
-    if (rowIndex === -1) return
-
-    const name = rows[rowIndex].name
-
-    if (name === undefined) return
-    fetchMatch(name).then(async teams => {
-      if (teams === undefined) return
-
-      console.log("Found teams for match ", name, teams)
-
-      // Get and store team names.
-      // Needs to be await, otherwise the set functions step on each other
-      await teamLookup(teams[0][0])
-      await teamLookup(teams[0][1])
-      await teamLookup(teams[0][2])
-      await teamLookup(teams[1][0])
-      await teamLookup(teams[1][1])
-      await teamLookup(teams[1][2])
-
-
-      // Copy since original is immutable
-      const newRows = [...rows];
-      let newRow = {...newRows[rowIndex]};
-
-      newRow.red1 = teams[0][0]
-      newRow.red2 = teams[0][1]
-      newRow.red3 = teams[0][2]
-      newRow.blue1 = teams[1][0]
-      newRow.blue2 = teams[1][1]
-      newRow.blue3 = teams[1][2]
-
-
-      console.log("Adding ", newRow, rowIndex)
-      newRows[rowIndex] = newRow;
-      setRows(newRows)
-
-      console.log("Done Set")
-    })
-    console.log("Found")
-  })
-
-  const fetchMatch = async (matchName: string) => {
-    // Get Data for an individual match
-    console.log('fetching match ', matchName)
-    try {
-      let response;
-      if (matchName.startsWith('Q')) {
-        const matchNumber = matchName.replace('Q', '')
-        response = await fetch(`http://${serverUrl}/api/v1/events/${selectedEvent?.eventCode}/matches/${matchNumber}/`)
-
-      } else {
-        response = await fetch(`http://${serverUrl}/api/v2/events/${selectedEvent?.eventCode}/elims/${matchName.toLowerCase()}/`)
-      }
-      if (response.status === 429) {
-        console.error("Rate limit fetching match data")
-        return [[], []]
-      }
-      let match = await response.json()
-
-      const blue_teams = [match.blue.robot1, match.blue.robot2, match.blue.robot3]
-      const red_teams = [match.red.robot1, match.red.robot2, match.red.robot3]
-      return [red_teams,blue_teams]
-
-
-    } catch (error) {
-      console.error('Fetching matches failed: ', error)
-      return [[], []]
+    function addTeam(team:TeamData){
+      if(!team?.number) return
+      if (teams.find(t => t.number === team.number)) return
+      setTeams(currentTeams=>{return[...currentTeams,{number:team.number,name:team.name}]})
     }
-  }
-
-  useEffect(() => {
     if (latestStreamData) {
+      if (["TIMEOUT_UPDATE", "PIT_UPDATE", "SCORE_UPDATE"].includes(latestStreamData.type)  ) {
+        return
+      }
+
+      console.debug("ZZZZ",latestStreamData)
+      if (!UpdateTypes.includes(categoryRemapper(latestStreamData.type))) {
+        console.log("Unknown type", categoryRemapper(latestStreamData.type))
+        return
+      }
+      if  (isMatch(latestStreamData.params)) {
+        console.log("Setting matchName:", latestStreamData.params?.matchName, " index:", latestStreamData.index, " category:", latestStreamData.type, " @ Time:", latestStreamData.ts)
+      }
+      else if (isAward(latestStreamData.params)) {
+        console.log("Setting awards:", latestStreamData.params.award.name, " index:", latestStreamData.index, " category:", latestStreamData.type, " @ Time:", latestStreamData.ts)
+      }
+
       setRows(currentRows => {
         // Check if the row already exists
-        const rowIndex = currentRows.findIndex(row => row.name === latestStreamData.payload.shortName);
-        if (rowIndex !== -1) {
-          console.log('update row');
-          // Clone the array and update the specific row
-          const newRows = [...currentRows];
-          let newRow = { ...newRows[rowIndex] };
-          newRow[latestStreamData.updateType] = latestStreamData.updateTime;
-          newRow.name = latestStreamData.payload.shortName;
-          newRows[rowIndex] = newRow;
-          return newRows;
-        } else {
-          console.log('create new row');
-          // Create a new row and add it to the array
-          let newRow: MatchRow = {
-            number: latestStreamData.payload.number,
-            name: latestStreamData.payload.shortName,
-            [latestStreamData.updateType]: latestStreamData.updateTime
-          };
-          return [...currentRows, newRow];
+        if  (isMatch(latestStreamData.params)) {
+
+          var matchName = latestStreamData.params.matchName
+          if (!latestStreamData.params.elims) {
+            matchName = "Q"+ latestStreamData.params.number
+          }
+          let rowIndex = currentRows.findIndex(row => row.name === matchName);
+          if (!(latestStreamData.ts >0)) {
+            console.error("Skipping bogus timestamp", latestStreamData.type, latestStreamData.ts)
+            return currentRows
+          }
+
+          if (rowIndex !== -1) {
+            console.debug('update row');
+            // Clone the array and update the specific row
+            const newRows = [...currentRows];
+            let newRow = {...newRows[rowIndex]};
+            // @ts-ignore
+            newRow[categoryRemapper(latestStreamData.type)] = latestStreamData.ts;
+            newRow.name = matchName;
+            newRows[rowIndex] = newRow;
+            return newRows;
+          } else {
+            if (!latestStreamData.params.red) return currentRows
+            console.debug('create new row');
+
+            // Create a new row and add it to the array
+            console.debug(latestStreamData.params)
+
+            console.debug(latestStreamData.type)
+            let matchName = latestStreamData.params.matchName
+            if (!latestStreamData.params.elims) {
+              matchName = "Q"+ latestStreamData.params.number
+            }
+            let newRow: MatchRow = {
+              award_mode: false,
+              number: latestStreamData.index,
+              name: matchName,
+
+
+              [categoryRemapper(latestStreamData.type)]: latestStreamData.ts,
+              red1: latestStreamData.params.red.teams[0].number,
+              red2: latestStreamData.params.red.teams[1].number,
+              red3: latestStreamData.params.red.teams[2]?.number,
+              blue1: latestStreamData.params.blue.teams[0].number,
+              blue2: latestStreamData.params.blue.teams[1].number,
+              blue3: latestStreamData.params.blue.teams[2]?.number,
+            };
+            addTeam(latestStreamData.params.red.teams[0] as TeamData)
+            addTeam(latestStreamData.params.red.teams[1] as TeamData)
+            addTeam(latestStreamData.params.red.teams[2] as TeamData)
+            addTeam(latestStreamData.params.blue.teams[0] as TeamData)
+            addTeam(latestStreamData.params.blue.teams[1] as TeamData)
+            addTeam(latestStreamData.params.blue.teams[2] as TeamData)
+            return [...currentRows, newRow];
+          }
+        } else if (latestStreamData.type === "SHOW_AWARD" && isAward(latestStreamData.params)) {
+          if (latestStreamData.params.place !== -1) return currentRows
+          const awardName = latestStreamData.params.award.name
+          let rowIndex = currentRows.findIndex(row => row.name === awardName);
+          if (rowIndex !== -1){
+            console.debug('update row');
+            // Clone the array and update the specific row
+            const newRows = [...currentRows];
+            let newRow = {...newRows[rowIndex]};
+            newRow.SHOW_PREVIEW = latestStreamData.ts;
+            newRows[rowIndex] = newRow;
+            return newRows;
+          } else {
+            let newRow: MatchRow = {
+              award_mode: true,
+              name: latestStreamData.params.award.name,
+              SHOW_PREVIEW: latestStreamData.ts,
+              number: latestStreamData.index,
+            }
+            return [...currentRows, newRow];
+          }
+        }
+        else {
+          // Unhandled stuff
+          console.error("**Unhandled message", latestStreamData.type)
+          return currentRows
         }
       });
     }
-  }, [latestStreamData, setRows]); // Removed 'rows' and 'setRows' from the dependencies
+  }, [latestStreamData, setRows, setTeams, teams]); // Removed 'rows' and 'setRows' from the dependencies
+
 
 
   useEffect(() => {
+
+    function calcTimeString(actionTime:number, firstTime:number) {
+      let time = ((actionTime ?? 0) - firstTime) / 1000 + offsetTime
+      let timeString = "N/A"
+      if (time >= 0) {
+        // Negative times look bad so show N/A instead
+        const hours = Math.floor(time / 3600)
+        time -= hours * 3600
+        const minutes = Math.floor(time / 60)
+        time -= minutes * 60
+        const seconds = Math.floor(time)
+        timeString = `${hours < 10 ? '0' + hours : hours}:${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`
+      }
+      return timeString;
+    }
+
     const getTeamName = (number?: number) => {
       if (!number) return undefined;
       return teams.find(team => team.number === number)
@@ -194,74 +215,26 @@ const MatchEventsTable: React.FC = () => {
 
     const firstTime = useStreamTime? startStreamTime:rows[0]?.SHOW_PREVIEW ?? 0
     let chapters: string[] = rows.map(r => {
-      let blueTeams = `${r.blue1} ${getTeamName(r.blue1)?.name}, ${r.blue2} ${getTeamName(r.blue2)?.name}`
-      if (r.blue3)
-        blueTeams += `${r.blue3} ${getTeamName(r.blue3)?.name}`
-      let redTeams = `${r.red1} ${getTeamName(r.red1)?.name}, ${r.red2} ${getTeamName(r.red2)?.name}`
-      if (r.red3)
-        redTeams += `${r.red3} ${getTeamName(r.red3)?.name}`
-      let time = ((r.SHOW_PREVIEW ?? 0) - firstTime) / 1000 + offsetTime
-      let timeString = "N/A"
-      if (time>=0) {
-        // Negative times look bad so show N/A instead
-        const hours = Math.floor(time / 3600)
-        time -= hours * 3600
-        const minutes = Math.floor(time / 60)
-        time -= minutes * 60
-        const seconds = Math.floor(time)
-        timeString = `${hours < 10 ? '0' + hours : hours}:${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`
+      if (r.award_mode) {
+        let timeString = calcTimeString(r.SHOW_PREVIEW ?? r.SHOW_MATCH ?? r.MATCH_START ?? 0, firstTime);
+        return `${timeString} 🏆 ${r.name}`
+
+      } else {
+        let blueTeams = `🔵${r.blue1} ${getTeamName(r.blue1)?.name} 🔵 ${r.blue2} ${getTeamName(r.blue2)?.name}`
+        if (r.blue3)
+          blueTeams += `${r.blue3} ${getTeamName(r.blue3)?.name}`
+        let redTeams = `🔴 ${r.red1} ${getTeamName(r.red1)?.name} 🔴 ${r.red2} ${getTeamName(r.red2)?.name}`
+        if (r.red3)
+          redTeams += `${r.red3} ${getTeamName(r.red3)?.name}`
+        let timeString = calcTimeString(r.SHOW_PREVIEW ?? r.SHOW_MATCH ?? r.MATCH_START ?? 0, firstTime);
+        return `${timeString} ${r.name} ${blueTeams} ${redTeams}`
       }
-      return `${timeString} ${r.name} - Blue: ${blueTeams}; Red: ${redTeams}`
     })
     setChapters(['00:00:00 Event Start', ...chapters])
   }, [rows, setChapters, teams, offsetTime, startStreamTime, useStreamTime])
 
-  const delay = (seconds: number) => {
-    return new Promise(resolve => setTimeout(resolve, seconds * 1000))
-  }
 
   const fetchMatches = async () => {
-    console.log('fetching matches')
-    try {
-      const response = await fetch(`http://${serverUrl}/api/v1/events/${selectedEvent?.eventCode}/matches/`)
-      const matches = (await response.json()).matches as FtcMatch[];
-      const newRows = matches.map(match => {
-        const rowIndex = rows.findIndex(row => row.name === match.matchName)
-        let row: MatchRow;
-        if (rowIndex !== -1) {
-          row = { ...rows[rowIndex] }
-        } else {
-          row = { name: match.matchName, number: match.matchNumber }
-        }
-        row.blue1 = match.blue.team1
-        row.blue2 = match.blue.team2
-        row.blue3 = match.blue.team3
-        row.red1 = match.red.team1
-        row.red2 = match.red.team2
-        row.red3 = match.red.team3
-        row.scheduledTime = match.time
-        return row
-      })
-      setRows(newRows)
-      const teamsResponse = await fetch(`http://${serverUrl}/api/v1/events/${selectedEvent?.eventCode}/teams/`)
-      const teamNumbers = (await teamsResponse.json()).teamNumbers as number[];
-      const newTeams = await Promise.all(teamNumbers.map(async teamNumber => {
-        let retryCount = 0;
-        let teamDataResponse = await fetch(`http://${serverUrl}/api/v1/events/${selectedEvent?.eventCode}/teams/${teamNumber}/`)
-        while (retryCount < 10 && teamDataResponse.status === 429) {
-          retryCount++;
-          await delay(60 * 5); // wait 5 minute before trying again
-        }
-        const teamData = (await teamDataResponse.json()) as TeamData;
-        return {
-          number: teamNumber,
-          name: teamData.name
-        };
-      }))
-      setTeams(newTeams)
-    } catch (error) {
-      console.error('Fetching matches failed: ', error)
-    }
   }
 
   const clearRows = () => {
@@ -289,47 +262,47 @@ const MatchEventsTable: React.FC = () => {
       <button onClick={fetchMatches} disabled={!isConnected}>Get Match List</button>
       <button onClick={clearRows}>Clear All Data</button>
       <button onClick={exportData}>Export Data</button>
-      <table>
+      <table border={1}>
         <thead>
           <tr>
-            <th>Number</th>
+            <th>ID</th>
             <th>Name</th>
-            <th>Schedule Time</th>
+            {/*<th>Schedule Time</th>*/}
             <th>Blue 1</th>
             <th>Blue 2</th>
-            <th>Blue 3</th>
+            {/*<th>Blue 3</th>*/}
             <th>Red 1</th>
             <th>Red 2</th>
-            <th>Red 3</th>
+            {/*<th>Red 3</th>*/}
             <th>LOAD</th>
             <th>SHOW PREVIEW</th>
-            <th>SHOW RANDOM</th>
+            {/*<th>SHOW RANDOM</th>*/}
             <th>SHOW MATCH</th>
             <th>START</th>
             <th>ABORT</th>
-            <th>COMMIT</th>
+            {/*<th>COMMIT</th>*/}
             <th>POST</th>
           </tr>
         </thead>
         <tbody>
           {rows.map(row => (
-            <tr key={row.number}>
+            <tr key={row.name}>
               <td>{row.number}</td>
               <td>{row.name}</td>
-              <td>{row.scheduledTime ? new Date(row.scheduledTime).toLocaleTimeString() : ''}</td>
+              {/*<td>{row.scheduledTime ? new Date(row.scheduledTime).toLocaleTimeString() : ''}</td>*/}
               <td>{row.blue1}</td>
               <td>{row.blue2}</td>
-              <td>{row.blue3}</td>
+              {/*<td>{row.blue3}</td>*/}
               <td>{row.red1}</td>
               <td>{row.red2}</td>
-              <td>{row.red3}</td>
+              {/*<td>{row.red3}</td>*/}
               <td>{row.MATCH_LOAD ? new Date(row.MATCH_LOAD).toLocaleTimeString() : ''}</td>
               <td>{row.SHOW_PREVIEW ? new Date(row.SHOW_PREVIEW).toLocaleTimeString() : ''}</td>
-              <td>{row.SHOW_RANDOM ? new Date(row.SHOW_RANDOM).toLocaleTimeString() : ''}</td>
+              {/*<td>{row.SHOW_RANDOM ? new Date(row.SHOW_RANDOM).toLocaleTimeString() : ''}</td>*/}
               <td>{row.SHOW_MATCH ? new Date(row.SHOW_MATCH).toLocaleTimeString() : ''}</td>
               <td>{row.MATCH_START ? new Date(row.MATCH_START).toLocaleTimeString() : ''}</td>
               <td>{row.MATCH_ABORT ? new Date(row.MATCH_ABORT).toLocaleTimeString() : ''}</td>
-              <td>{row.MATCH_COMMIT ? new Date(row.MATCH_COMMIT).toLocaleTimeString() : ''}</td>
+              {/*<td>{row.MATCH_COMMIT ? new Date(row.MATCH_COMMIT).toLocaleTimeString() : ''}</td>*/}
               <td>{row.MATCH_POST ? new Date(row.MATCH_POST).toLocaleTimeString() : ''}</td>
             </tr>
           ))}
@@ -350,9 +323,11 @@ const MatchEventsTable: React.FC = () => {
              onChange={(e) => setUseStreamTime(e.target.checked)}
       />
       <br />
-      <div>
-        {chapters.map((chapter, i) => (<div key={i}>{chapter}</div>))}
-      </div>
+      <hr/>
+
+      <ul style={{margin: 'auto', display:'inline-block', border:'1px black',textAlign:'left', listStyleType: 'none'}}>
+        {chapters.map((chapter, i) => (<li  key={i}>{chapter}</li>))}
+      </ul>
 
     </div>
   )

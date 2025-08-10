@@ -2,9 +2,13 @@ import { useObsStudio } from '../contexts/ObsStudioContext';
 import { useFtcLive } from '../contexts/FtcLiveContext';
 import React, {useState} from "react";
 
-type sourceData = {
+export type sourceData = {
+    toggle: boolean;
     name: string;
     url: string;
+    new: string;
+    param_name: string;
+    source_type: string;
 }
 
 
@@ -16,31 +20,51 @@ const BrowserSourceUpdater = () => {
 
 
     const handleFetchScenes = async () => {
-        setRows(await fetchBrowserSources())
+        setRows(await fetchBrowserSources(serverUrl,selectedEvent?.eventCode ?? "NO_EVENT"))
   };
     const handleUpdateEvent = async() => {
-        await updateEventCode(serverUrl,selectedEvent?.eventCode ?? "NO_EVENT")
-        setRows(await fetchBrowserSources())
+        await updateEventCode(rows)
     }
+
+    const handleCheckboxChange = (updateRow: sourceData) => {
+        const nextRows = rows.map(row => {
+            if (row.name === updateRow.name){
+                row.toggle = !row.toggle
+            }
+            return row
+        });
+        setRows(nextRows);
+
+    };
 
   return (
     <div className="section" style={{overflowX:"scroll"}}>
         <h2>Update Browser Source URLs </h2>
-        <button onClick={() => handleFetchScenes ()} disabled={!isConnected}>Fetch Broswer Sources</button>
+        <button onClick={() => handleFetchScenes ()} disabled={(!isConnected || !isFtcLiveConnected)}>Fetch Broswer Sources</button>
         <button onClick={() => handleUpdateEvent()} disabled={(!isConnected || !isFtcLiveConnected)}>Update Event Code</button>
-        <table>
+        <table border={1}>
             <thead>
             <tr>
+                <th>Update?</th>
                 <th>Source Name</th>
-                <th>URL</th>
+                <th>Type</th>
+                <th>Old Value<br/>New Value</th>
 
             </tr>
             </thead>
             <tbody>
             {rows.map(row => (
                 <tr key={row.name} >
+                    <td><input
+                        type="checkbox"
+                        checked={row.toggle}
+                        onChange={() => handleCheckboxChange(row)}
+                    /></td>
+
                     <td style={{textAlign: 'left', whiteSpace: "nowrap", paddingRight: "1em"}}>{row.name}</td>
-                    <td  style={{textAlign: 'left',whiteSpace: "nowrap"}}>{row.url}</td>
+                    <td style={{textAlign: 'left',whiteSpace: "nowrap"}}>{row.source_type}</td>
+                    <td style={{textAlign: 'left',whiteSpace: "nowrap"}}>{row.url}<br/>{row.new}</td>
+
 
                 </tr>
             ))}

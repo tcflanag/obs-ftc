@@ -1,16 +1,12 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from 'react';
 import OBSWebSocket from 'obs-websocket-js';
+import type {sourceData} from '../components/BrowserSourceUpdater';
 import { usePersistentState } from '../helpers/persistant';
 import type {OBSEventTypes} from "obs-websocket-js/dist/types";
 
 type ObsStudioProviderProps = {
   children: ReactNode;
 };
-
-type sourceData = {
-  name: string;
-  url: string;
-}
 
 const obs = new OBSWebSocket();
 
@@ -29,8 +25,8 @@ interface ObsStudioContextData {
   fetchScenes: () => Promise<string[]>;
   switchScenes: (scene: string) => void;
   setActiveField: (field: number) => void;
-  updateEventCode: (url: string, eventCode: string) => void;
-  fetchBrowserSources: () => Promise<sourceData[]>;
+  updateEventCode: (rows: sourceData[]) => void;
+  fetchBrowserSources: (url: string, eventCode: string) => Promise<sourceData[]>;
   field1Scene?: string;
   setField1Scene: React.Dispatch<React.SetStateAction<string | undefined>>;
   field2Scene?: string;
@@ -123,22 +119,60 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
       console.error("Unable to switch scene. Not connected");
     }
   }
-  const fetchBrowserSources = useCallback(async (): Promise<sourceData[] > => {
-    try {
-      let inputList: sourceData[] = []
-      const {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
 
-      for (const inp of inputs) {
-        const inputName = inp?.inputName?.toString() ?? ""
-        const {inputSettings} = await obs.call('GetInputSettings', {inputName: inputName});
-
-        let decoded_url = new URL(inputSettings?.url?.toString() ?? "")
+  // @ts-ignore
+  async function url_extractor(inputs, eventCode: string, url: string, inputList: sourceData[], param_name: string, source_type: string) {
+    for (const inp of inputs) {
+      const inputName = inp?.inputName?.toString() ?? ""
+      const {inputSettings} = await obs.call('GetInputSettings', {inputName: inputName});
+      try {
+        const old_value = inputSettings[param_name]?.toString()  ?? ""
+        let decoded_url = new URL(old_value)
         let split_path = decoded_url.pathname.split('/')
         if (split_path[1] === 'event') {
-          const data: sourceData= {name:inputName, url:inputSettings?.url?.toString() ?? ""}
-          inputList.push(data)
+
+          split_path[2] = eventCode
+          decoded_url.pathname = split_path.join('/')
+          decoded_url.hostname = url
+        } else if (decoded_url.host === 'ftc-events.firstinspires.org' || decoded_url.host === 'ftc.events') {
+          split_path[2] = eventCode
+          decoded_url.pathname = split_path.join('/')
+        } else {
+          continue
         }
+        const data: sourceData = {
+          name: inputName,
+          url: old_value,
+          toggle: true,
+          new: decoded_url.href,
+          source_type: source_type,
+          param_name: param_name
+        }
+        inputList.push(data)
+      } catch (error) {
+        continue
       }
+    }
+  }
+
+  const fetchBrowserSources = useCallback(async (url: string, eventCode: string): Promise<sourceData[] > => {
+    try {
+      let inputList: sourceData[] = []
+
+      // Browser Sources
+      let {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
+      await url_extractor(inputs, eventCode, url, inputList, "url", "Browser");
+
+      // Text Sources
+      ({inputs} = await obs.call('GetInputList', {inputKind: 'text_gdiplus_v2'}));
+      await url_extractor(inputs, eventCode, url, inputList, "text", "Text");
+
+      // Update QR Source
+      ({inputs} = await obs.call('GetInputList', {inputKind: 'streamqr_source'}))
+      await url_extractor(inputs, eventCode, url, inputList, "content", "QR");
+
+
+
       console.log("inputs:", inputList)
       return inputList;
     } catch (error) {
@@ -147,29 +181,14 @@ export const ObsStudioProvider: React.FC<ObsStudioProviderProps> = ({ children }
     }
   }, []);
 
-  const updateEventCode = async (url: string, eventCode: string) => {
-    const {inputs} = await obs.call('GetInputList', {inputKind: 'browser_source'});
-    console.log("Changing URLs to", url," and code ", eventCode)
-    console.log(inputs)
-    for (const inp of inputs) {
-      const inputName = inp?.inputName?.toString() ?? ""
-      const {inputSettings} = await obs.call('GetInputSettings', {inputName: inputName});
+  const updateEventCode = async (rows: sourceData[]) => {
 
-      let decoded_url = new URL(inputSettings?.url?.toString() ?? "")
-      let split_path = decoded_url.pathname.split('/')
-      if (split_path[1] === 'event') {
-        split_path[2] = eventCode
-        decoded_url.pathname = split_path.join('/')
-        decoded_url.hostname = url
+    for (const row of rows) {
+      if (!row.toggle) continue
 
-        console.log("Updated Source", inp.inputName, " to url ", decoded_url.href)
-
-      } else {
-        console.log("Path does not match filter on source",inp.inputName, " url ", decoded_url.pathname)
-      }
-
-      await obs.call('SetInputSettings', {inputName: inputName, overlay: true, inputSettings: {'url': decoded_url.href}})
+      await obs.call('SetInputSettings', {inputName: row.name, overlay: true, inputSettings: {[row.param_name]: row.new}})
     }
+
   }
 
   const setActiveField = async (field: number) => {
